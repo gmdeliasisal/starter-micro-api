@@ -54,7 +54,8 @@ const server = http.createServer((req, res) => {
         const githubSecret = 'mariorossi12345';
 
         // Verifica la provenienza della richiesta utilizzando la firma
-        if (verifySignature(githubSecret, req.headers,req.rawBody)) {
+       const signatureHeader = req.headers['x-hub-signature-256'];
+        if (verifySignature(githubSecret, signatureHeader, req.rawBody)) {
             console.log(`Got a POST request from GitHub at ${req.url}!`);
 
             let data = '';
