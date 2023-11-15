@@ -1,23 +1,22 @@
 const http = require('http');
 const url = require('url');
+const crypto = require('crypto');
+const encoder = new TextEncoder();
 
 const server = http.createServer((req, res) => {
-    if (req.method === 'POST') {
-        // Ottieni il nome del dominio del mittente dalla richiesta
-        const originDomain = req.headers['origin'] || req.headers['referer'];
+    if (req.method === 'POST') {      
+        const githubSecret = 'mariorossi12345';
 
-        // Verifica se il dominio del mittente è quello desiderato (es. github.com)
-        if (isRequestFromGitHub(originDomain)) {
+        // Verifica la provenienza della richiesta utilizzando la firma
+        if (verifyGitHubSignature(githubSecret, req)) {
             console.log(`Got a POST request from GitHub at ${req.url}!`);
 
             let data = '';
 
-            // Ascolta l'evento 'data' per ottenere il corpo della richiesta
             req.on('data', (chunk) => {
                 data += chunk;
             });
 
-            // Ascolta l'evento 'end' per elaborare il corpo quando è completamente ricevuto
             req.on('end', () => {
                 const requestBody = JSON.parse(data);
                 console.log('Request Body:', requestBody);
@@ -25,7 +24,7 @@ const server = http.createServer((req, res) => {
                 res.end('OK');
             });
         } else {
-            console.log(`Received a POST request from unauthorized domain ${originDomain}`);
+            console.log(`Received a POST request with invalid GitHub signature`);
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('Forbidden');
         }
@@ -41,8 +40,34 @@ server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
 });
 
-// Funzione per verificare se il dominio è quello desiderato (es. github.com)
-function isRequestFromGitHub(originDomain) {
-    // Aggiungi altri controlli se necessario
-    return originDomain && (originDomain.includes('github.com') || originDomain.includes('githubusercontent.com'));
+// Funzione per verificare la firma GitHub
+function verifyGitHubSignature(secret, req) {
+    const signature = req.headers['x-hub-signature-256'];
+
+    if (!signature) {
+        return false;
+    }
+
+    const sha256 = crypto.createHmac('sha256', secret);
+    const digest = sha256.update(req.rawBody || '').digest('hex');
+    const expectedSignature = `sha256=${digest}`;
+
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
 }
+
+// Middleware per ottenere il corpo della richiesta come stringa
+function rawBodyMiddleware(req, res, next) {
+    let data = '';
+
+    req.on('data', (chunk) => {
+        data += chunk;
+    });
+
+    req.on('end', () => {
+        req.rawBody = data;
+        next();
+    });
+}
+
+// Usa il middleware per ottenere il corpo della richiesta come stringa
+server.use(rawBodyMiddleware);
