@@ -3,6 +3,22 @@ const url = require('url');
 const crypto = require('crypto');
 const encoder = new TextEncoder();
 
+// Funzione per verificare la firma GitHub
+function verifyGitHubSignature(secret, req) {
+    const signature = req.headers['x-hub-signature-256'];
+
+    if (!signature) {
+        return false;
+    }
+
+    const sha256 = crypto.createHmac('sha256', secret);
+    const digest = sha256.update(req.rawBody || '').digest('hex');
+    const expectedSignature = `sha256=${digest}`;
+
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+}
+
+
 const server = http.createServer((req, res) => {
     if (req.method === 'POST') {
         const originDomain = req.headers['origin'] || req.headers['referer'];
@@ -60,7 +76,3 @@ server.on('request', (req, res) => {
     rawBodyMiddleware(req, res, () => {});
 });
 
-// Usa il middleware per ottenere il corpo della richiesta come stringa
-server.on('request', (req, res) => {
-    rawBodyMiddleware(req, res, () => {});
-});
