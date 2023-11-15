@@ -1,30 +1,43 @@
-const express = require('express');
-const bodyParser = require('body-parser');
+const http = require('http');
+const url = require('url');
 
-const app = express();
+const server = http.createServer((req, res) => {
+    if (req.method === 'POST') {
+        // Ottieni il nome del dominio del mittente dalla richiesta
+        const originDomain = req.headers['origin'] || req.headers['referer'];
 
-// Middleware per analizzare il corpo della richiesta POST
-app.use(bodyParser.json());
+        // Verifica se il dominio del mittente è quello desiderato (es. github.com)
+        if (isRequestFromGitHub(originDomain)) {
+            console.log(`Got a POST request from GitHub at ${req.url}!`);
 
-app.post('/', (req, res) => {
-    // Ottieni il nome del dominio del mittente dalla richiesta
-    const originDomain = req.get('origin') || req.get('referer');
+            let data = '';
 
-    // Verifica se il dominio del mittente è quello desiderato (es. github.com)
-    if (isRequestFromGitHub(originDomain)) {
-        console.log(`Got a POST request from GitHub at ${req.url}!`);
-        console.log('Request Body:', req.body);
+            // Ascolta l'evento 'data' per ottenere il corpo della richiesta
+            req.on('data', (chunk) => {
+                data += chunk;
+            });
 
-        res.status(200).send('OK');
+            // Ascolta l'evento 'end' per elaborare il corpo quando è completamente ricevuto
+            req.on('end', () => {
+                const requestBody = JSON.parse(data);
+                console.log('Request Body:', requestBody);
+                res.writeHead(200, { 'Content-Type': 'text/plain' });
+                res.end('OK');
+            });
+        } else {
+            console.log(`Received a POST request from unauthorized domain ${originDomain}`);
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            res.end('Forbidden');
+        }
     } else {
-        console.log(`Received a POST request from unauthorized domain ${originDomain}`);
-        res.status(403).send('Forbidden');
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
     }
 });
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
 });
 
