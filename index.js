@@ -53,28 +53,36 @@ const server = http.createServer((req, res) => {
         const originDomain = req.headers['origin'] || req.headers['referer'];
         const githubSecret = 'mariorossi12345';
 
-        // Verifica la provenienza della richiesta utilizzando la firma
-       const signatureHeader = req.headers['x-hub-signature-256'];
-        if (verifySignature(githubSecret, signatureHeader, req.rawBody)) {
-            console.log(`Got a POST request from GitHub at ${req.url}!`);
-
-            let data = '';
-
-            req.on('data', (chunk) => {
-                data += chunk;
-            });
-
-            req.on('end', () => {
-                const requestBody = JSON.parse(data);
-                console.log('Request Body:', requestBody);
-                res.writeHead(200, { 'Content-Type': 'text/plain' });
-                res.end('OK');
-            });
+         // Verifica la provenienza della richiesta utilizzando la firma
+        const signatureHeader = req.headers['x-hub-signature-256'];
+        
+        if (signatureHeader) {
+            if (verifySignature(githubSecret, signatureHeader, req.rawBody)) {
+                console.log(`Got a POST request from GitHub at ${req.url}!`);
+        
+                let data = '';
+        
+                req.on('data', (chunk) => {
+                    data += chunk;
+                });
+        
+                req.on('end', () => {
+                    const requestBody = JSON.parse(data);
+                    console.log('Request Body:', requestBody);
+                    res.writeHead(200, { 'Content-Type': 'text/plain' });
+                    res.end('OK');
+                });
+            } else {
+                console.log(`Received a POST request with invalid GitHub signature from ${originDomain}`);
+                res.writeHead(403, { 'Content-Type': 'text/plain' });
+                res.end('Forbidden');
+            }
         } else {
-            console.log(`Received a POST request with invalid GitHub signature from ${originDomain}`);
-            res.writeHead(403, { 'Content-Type': 'text/plain' });
-            res.end('Forbidden');
+            console.log(`Missing GitHub signature header from ${originDomain}`);
+            res.writeHead(400, { 'Content-Type': 'text/plain' });
+            res.end('Bad Request');
         }
+       
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('Not Found');
