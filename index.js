@@ -4,7 +4,8 @@ const crypto = require('crypto');
 const encoder = new TextEncoder();
 
 const server = http.createServer((req, res) => {
-    if (req.method === 'POST') {      
+    if (req.method === 'POST') {
+        const originDomain = req.headers['origin'] || req.headers['referer'];
         const githubSecret = 'mariorossi12345';
 
         // Verifica la provenienza della richiesta utilizzando la firma
@@ -24,7 +25,7 @@ const server = http.createServer((req, res) => {
                 res.end('OK');
             });
         } else {
-            console.log(`Received a POST request with invalid GitHub signature`);
+            console.log(`Received a POST request with invalid GitHub signature from ${originDomain}`);
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('Forbidden');
         }
@@ -39,21 +40,6 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
 });
-
-// Funzione per verificare la firma GitHub
-function verifyGitHubSignature(secret, req) {
-    const signature = req.headers['x-hub-signature-256'];
-
-    if (!signature) {
-        return false;
-    }
-
-    const sha256 = crypto.createHmac('sha256', secret);
-    const digest = sha256.update(req.rawBody || '').digest('hex');
-    const expectedSignature = `sha256=${digest}`;
-
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
-}
 
 // Middleware per ottenere il corpo della richiesta come stringa
 function rawBodyMiddleware(req, res, next) {
@@ -70,4 +56,6 @@ function rawBodyMiddleware(req, res, next) {
 }
 
 // Usa il middleware per ottenere il corpo della richiesta come stringa
-server.use(rawBodyMiddleware);
+server.on('request', (req, res) => {
+    rawBodyMiddleware(req, res, () => {});
+});
