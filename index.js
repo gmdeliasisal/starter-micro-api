@@ -3,7 +3,6 @@ const url = require('url');
 const crypto = require('crypto');
 const encoder = new TextEncoder();
 
-let encoder = new TextEncoder();
 
 async function verifySignature(secret, header, payload) {
     let parts = header.split("=");
