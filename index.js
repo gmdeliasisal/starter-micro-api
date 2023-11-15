@@ -3,19 +3,49 @@ const url = require('url');
 const crypto = require('crypto');
 const encoder = new TextEncoder();
 
-// Funzione per verificare la firma GitHub
-function verifyGitHubSignature(secret, req) {
-    const signature = req.headers['x-hub-signature-256'];
+let encoder = new TextEncoder();
 
-    if (!signature) {
-        return false;
+async function verifySignature(secret, header, payload) {
+    let parts = header.split("=");
+    let sigHex = parts[1];
+
+    let algorithm = { name: "HMAC", hash: { name: 'SHA-256' } };
+
+    let keyBytes = encoder.encode(secret);
+    let extractable = false;
+    let key = await crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        algorithm,
+        extractable,
+        [ "sign", "verify" ],
+    );
+
+    let sigBytes = hexToBytes(sigHex);
+    let dataBytes = encoder.encode(payload);
+    let equal = await crypto.subtle.verify(
+        algorithm.name,
+        key,
+        sigBytes,
+        dataBytes,
+    );
+
+    return equal;
+}
+
+function hexToBytes(hex) {
+    let len = hex.length / 2;
+    let bytes = new Uint8Array(len);
+
+    let index = 0;
+    for (let i = 0; i < hex.length; i += 2) {
+        let c = hex.slice(i, i + 2);
+        let b = parseInt(c, 16);
+        bytes[index] = b;
+        index += 1;
     }
 
-    const sha256 = crypto.createHmac('sha256', secret);
-    const digest = sha256.update(req.rawBody || '').digest('hex');
-    const expectedSignature = `sha256=${digest}`;
-
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+    return bytes;
 }
 
 
@@ -25,7 +55,7 @@ const server = http.createServer((req, res) => {
         const githubSecret = 'mariorossi12345';
 
         // Verifica la provenienza della richiesta utilizzando la firma
-        if (verifyGitHubSignature(githubSecret, req)) {
+        if (verifySignature(githubSecret, req.headers,req.rawBody)) {
             console.log(`Got a POST request from GitHub at ${req.url}!`);
 
             let data = '';
