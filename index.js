@@ -59,3 +59,8 @@ function rawBodyMiddleware(req, res, next) {
 server.on('request', (req, res) => {
     rawBodyMiddleware(req, res, () => {});
 });
+
+// Usa il middleware per ottenere il corpo della richiesta come stringa
+server.on('request', (req, res) => {
+    rawBodyMiddleware(req, res, () => {});
+});
